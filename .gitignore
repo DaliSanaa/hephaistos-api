@@ -3,3 +3,4 @@ dist
 .env
 
 /generated/prisma
+.github/workflows/ci.yml
