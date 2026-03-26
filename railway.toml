@@ -2,12 +2,8 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "npm run start:prod"
+startCommand = "npx prisma generate && npm run start:prod"
 healthcheckPath = "/api/v1/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 60
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
-releaseCommand = "npx prisma migrate deploy"
-
-[[services]]
-name = "hephaistos-api"
