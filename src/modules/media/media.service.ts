@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { nanoid } from 'nanoid';
+import { randomBytes } from 'crypto';
+
+function rid(len = 12): string {
+  return randomBytes(len).toString('base64url').slice(0, len);
+}
 
 @Injectable()
 export class MediaService {
@@ -38,7 +42,7 @@ export class MediaService {
     expiresIn: number;
   }> {
     const ext = fileName.includes('.') ? fileName.split('.').pop() : 'bin';
-    const key = `${context}/${userId}/${nanoid(12)}.${ext}`;
+    const key = `${context}/${userId}/${rid(12)}.${ext}`;
     const bucket =
       this.config.get<string>('R2_BUCKET_NAME') ?? 'hephaistos-media';
     const publicBase = (this.config.get<string>('R2_PUBLIC_URL') ?? '').replace(
