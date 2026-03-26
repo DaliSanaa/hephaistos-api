@@ -1,0 +1,459 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── USER ────────────────────────────────────────────
+
+enum UserType {
+  BUSINESS
+  PRIVATE
+}
+
+enum UserRole {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  VERIFIED
+  FAILED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  userType     UserType
+  role         UserRole  @default(BUYER)
+  phone        String?
+  countryCode  String
+  companyName  String?
+  vatNumber    String?
+
+  mangopayUserId        String?   @unique
+  mangopayWalletId      String?
+  mangopayBankAccountId String?
+  kycStatus             KycStatus @default(NOT_STARTED)
+
+  cardValidated Boolean @default(false)
+
+  lastLoginIp       String?
+  deviceFingerprint String?
+  strikeCount       Int       @default(0)
+  suspendedAt       DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  lots                     Lot[]
+  bids                     Bid[]
+  watchlist                WatchlistItem[]
+  notifications            Notification[]
+  sellerPayouts            Payout[]
+  buyerTransactions        Transaction[]           @relation("BuyerTransaction")
+  sellerTransactions       Transaction[]           @relation("SellerTransaction")
+  events                   Event[]
+  notificationPreferences  NotificationPreferences?
+
+  @@index([email])
+  @@index([mangopayUserId])
+  @@index([role])
+  @@index([createdAt])
+}
+
+// ─── VERTICAL & CATEGORY ─────────────────────────────
+
+model Vertical {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  labelKey  String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+
+  categories Category[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+}
+
+model Category {
+  id         String   @id @default(cuid())
+  verticalId String
+  slug       String   @unique
+  name       String
+  labelKey   String
+  icon       String
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+
+  vertical      Vertical       @relation(fields: [verticalId], references: [id])
+  specTemplates SpecTemplate[]
+  lots          Lot[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([verticalId])
+  @@index([slug])
+}
+
+model SpecTemplate {
+  id         String   @id @default(cuid())
+  categoryId String
+  key        String
+  labelKey   String
+  type       String
+  unit       String?
+  unitKey    String?
+  options    String[]
+  optionKeys String[]
+  required   Boolean  @default(false)
+  showInCard Boolean  @default(false)
+  showInGrid Boolean  @default(true)
+  sortOrder  Int      @default(0)
+
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@unique([categoryId, key])
+  @@index([categoryId])
+}
+
+// ─── LOT ─────────────────────────────────────────────
+
+enum LotStatus {
+  DRAFT
+  PENDING_REVIEW
+  ACTIVE
+  ENDED
+  SOLD
+  CANCELLED
+  REJECTED
+}
+
+enum AuctionType {
+  TIMED
+  BUY_NOW
+}
+
+enum AuctionStatus {
+  UPCOMING
+  LIVE
+  ENDED
+  CANCELLED
+}
+
+model Lot {
+  id            String          @id @default(cuid())
+  slug          String          @unique
+  listingRef    String          @unique
+  title         String
+  brand         String
+  model         String
+  year          Int
+  categoryId    String
+  condition     String
+  description   String
+  status        LotStatus       @default(DRAFT)
+  specs         Json            @default("{}")
+  sellerId      String
+  auctionType   AuctionType
+  auctionStatus AuctionStatus   @default(UPCOMING)
+  startingPrice Int
+  reservePrice  Int?
+  buyNowPrice   Int?
+  startDate     DateTime
+  endDate       DateTime
+  currentBid    Int             @default(0)
+  bidCount      Int             @default(0)
+  reserveMet    Boolean         @default(false)
+  winnerId      String?
+  reviewNote    String?
+  rejectionReason String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  category    Category      @relation(fields: [categoryId], references: [id])
+  seller      User          @relation(fields: [sellerId], references: [id])
+  location    LotLocation?
+  images      LotImage[]
+  documents   LotDocument[]
+  bids        Bid[]
+  watchedBy   WatchlistItem[]
+  transaction Transaction?
+
+  @@index([slug])
+  @@index([categoryId])
+  @@index([sellerId])
+  @@index([status])
+  @@index([auctionStatus])
+  @@index([endDate])
+  @@index([currentBid])
+  @@index([createdAt])
+  @@index([status, auctionStatus, endDate])
+}
+
+model LotLocation {
+  id          String @id @default(cuid())
+  lotId       String @unique
+  city        String
+  region      String
+  country     String
+  countryCode String
+  lat         Float
+  lng         Float
+
+  lot Lot @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  @@index([countryCode])
+  @@index([lat, lng])
+}
+
+model LotImage {
+  id        String  @id @default(cuid())
+  lotId     String
+  url       String
+  sortOrder Int     @default(0)
+  isPrimary Boolean @default(false)
+
+  lot Lot @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  @@index([lotId])
+}
+
+model LotDocument {
+  id   String @id @default(cuid())
+  lotId String
+  name String
+  type String
+  url  String
+  size String
+
+  lot Lot @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  @@index([lotId])
+}
+
+// ─── BIDDING ─────────────────────────────────────────
+
+model Bid {
+  id        String  @id @default(cuid())
+  lotId     String
+  userId    String
+  amount    Int
+  ip        String?
+  userAgent String?
+
+  lot  Lot  @relation(fields: [lotId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([lotId, createdAt])
+  @@index([userId])
+  @@index([lotId, amount])
+}
+
+// ─── TRANSACTION & ESCROW ────────────────────────────
+
+enum TransactionStatus {
+  AWAITING_PAYMENT
+  PAYMENT_RECEIVED
+  INSPECTION_WINDOW
+  COMPLETED
+  DISPUTED
+  DISPUTE_RESOLVED
+  REFUNDED
+  PAYMENT_FAILED
+  NON_PAYMENT
+}
+
+model Transaction {
+  id              String            @id @default(cuid())
+  lotId           String            @unique
+  buyerId         String
+  sellerId        String
+  hammerPrice     Int
+  buyerPremium    Int
+  vatAmount       Int               @default(0)
+  totalAmount     Int
+  sellerPayout    Int
+  platformRevenue Int
+  status          TransactionStatus @default(AWAITING_PAYMENT)
+
+  paymentDeadline   DateTime
+  paymentReceivedAt DateTime?
+  mangopayPayInId   String?
+
+  inspectionDeadline DateTime?
+  buyerConfirmedAt   DateTime?
+
+  mangopayTransferId String?
+  mangopayPayOutId   String?
+  payoutTriggeredAt  DateTime?
+
+  depositPreAuthId String?
+  depositAmount    Int?
+  depositCaptured  Boolean @default(false)
+
+  lot     Lot     @relation(fields: [lotId], references: [id])
+  buyer   User    @relation("BuyerTransaction", fields: [buyerId], references: [id])
+  seller  User    @relation("SellerTransaction", fields: [sellerId], references: [id])
+  dispute Dispute?
+  payout  Payout?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([status])
+  @@index([paymentDeadline])
+  @@index([inspectionDeadline])
+}
+
+// ─── DISPUTES ────────────────────────────────────────
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED_BUYER
+  RESOLVED_SELLER
+  RESOLVED_PARTIAL
+  CANCELLED
+}
+
+model Dispute {
+  id              String        @id @default(cuid())
+  transactionId   String        @unique
+  raisedById      String
+  reason          String
+  description     String
+  evidence        Json?
+  resolution      String?
+  refundAmount    Int?
+  status          DisputeStatus @default(OPEN)
+
+  transaction Transaction @relation(fields: [transactionId], references: [id])
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  resolvedAt DateTime?
+
+  @@index([status])
+}
+
+// ─── PAYOUTS ─────────────────────────────────────────
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Payout {
+  id               String       @id @default(cuid())
+  transactionId    String       @unique
+  sellerId         String
+  amount           Int
+  mangopayPayoutId String?
+  status           PayoutStatus @default(PENDING)
+
+  transaction Transaction @relation(fields: [transactionId], references: [id])
+  seller      User        @relation(fields: [sellerId], references: [id])
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([sellerId])
+  @@index([status])
+}
+
+// ─── WATCHLIST ───────────────────────────────────────
+
+model WatchlistItem {
+  id     String @id @default(cuid())
+  userId String
+  lotId  String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lot  Lot  @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, lotId])
+  @@index([userId])
+}
+
+// ─── NOTIFICATIONS ───────────────────────────────────
+
+model Notification {
+  id       String  @id @default(cuid())
+  userId   String
+  title    String
+  body     String
+  read     Boolean @default(false)
+  type     String?
+  metadata Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model NotificationPreferences {
+  id                  String  @id @default(cuid())
+  userId              String  @unique
+  outbid              Boolean @default(true)
+  endingSoon          Boolean @default(true)
+  newLotsInCategories Boolean @default(true)
+  wonAuction          Boolean @default(true)
+  paymentConfirmation Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── EVENT LOG (AI/ML pipeline) ──────────────────────
+
+model Event {
+  id         String  @id @default(cuid())
+  type       String
+  userId     String?
+  entityId   String?
+  entityType String?
+  payload    Json
+  ip         String?
+  userAgent  String?
+
+  user User? @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([userId])
+  @@index([entityId, entityType])
+  @@index([createdAt])
+  @@index([type, createdAt])
+}
