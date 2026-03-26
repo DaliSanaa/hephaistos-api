@@ -58,7 +58,6 @@
     "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.3",
     "mangopay2-nodejs-sdk": "^1.62.2",
-    "nanoid": "^5.1.7",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "prisma": "^6.19.2",
@@ -113,7 +112,7 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
-    "transformIgnorePatterns": ["/node_modules/(?!nanoid/)"],
+    "transformIgnorePatterns": ["/node_modules/"],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],

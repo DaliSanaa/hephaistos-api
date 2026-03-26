@@ -1,7 +1,11 @@
+import { randomBytes } from 'crypto';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
-import { nanoid } from 'nanoid';
 import type { Queue } from 'bullmq';
+
+function rid(len = 12): string {
+  return randomBytes(len).toString('base64url').slice(0, len);
+}
 import type {
   BankWireDetails,
   PaymentProvider,
@@ -27,8 +31,8 @@ export class MockPaymentProvider implements PaymentProvider {
     vatNumber?: string;
   }): Promise<PaymentProviderUser> {
     void user;
-    const externalUserId = `mock_user_${nanoid(12)}`;
-    const walletId = `mock_wallet_${nanoid(12)}`;
+    const externalUserId = `mock_user_${rid(12)}`;
+    const walletId = `mock_wallet_${rid(12)}`;
     return Promise.resolve({ externalUserId, walletId });
   }
 
@@ -36,7 +40,7 @@ export class MockPaymentProvider implements PaymentProvider {
     externalUserId: string,
     returnUrl: string,
   ): Promise<{ redirectUrl: string; validationId: string }> {
-    const validationId = `mock_cv_${nanoid(8)}`;
+    const validationId = `mock_cv_${rid(8)}`;
     await this.paymentQueue.add(
       'mock:card-validated',
       { externalUserId, validationId },
@@ -55,7 +59,7 @@ export class MockPaymentProvider implements PaymentProvider {
   ): Promise<{ documentId: string }> {
     void documentType;
     void pages;
-    const documentId = `mock_kyc_${nanoid(8)}`;
+    const documentId = `mock_kyc_${rid(8)}`;
     await this.paymentQueue.add(
       'mock:kyc-verified',
       { externalUserId, documentId },
@@ -80,8 +84,8 @@ export class MockPaymentProvider implements PaymentProvider {
     void externalUserId;
     void walletId;
     void tag;
-    const payInId = `mock_payin_${nanoid(8)}`;
-    const wireReference = `HPH-${nanoid(6).toUpperCase()}`;
+    const payInId = `mock_payin_${rid(8)}`;
+    const wireReference = `HPH-${rid(6).toUpperCase()}`;
     await this.paymentQueue.add(
       'mock:payin-succeeded',
       { payInId, amountCents },
@@ -106,7 +110,7 @@ export class MockPaymentProvider implements PaymentProvider {
     void toWalletId;
     void amountCents;
     void feesCents;
-    return Promise.resolve({ transferId: `mock_transfer_${nanoid(8)}` });
+    return Promise.resolve({ transferId: `mock_transfer_${rid(8)}` });
   }
 
   async createPayout(
@@ -119,7 +123,7 @@ export class MockPaymentProvider implements PaymentProvider {
     void walletId;
     void bankAccountId;
     void amountCents;
-    const payoutId = `mock_payout_${nanoid(8)}`;
+    const payoutId = `mock_payout_${rid(8)}`;
     await this.paymentQueue.add(
       'mock:payout-succeeded',
       { payoutId },
@@ -140,6 +144,6 @@ export class MockPaymentProvider implements PaymentProvider {
     void bic;
     void ownerName;
     void ownerAddress;
-    return Promise.resolve({ bankAccountId: `mock_bank_${nanoid(8)}` });
+    return Promise.resolve({ bankAccountId: `mock_bank_${rid(8)}` });
   }
 }
