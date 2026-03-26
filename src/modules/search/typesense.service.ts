@@ -88,11 +88,18 @@ export class TypesenseService implements OnModuleInit {
       return;
     }
 
-    const host = this.config.get<string>('TYPESENSE_HOST') ?? 'localhost';
+    const host = this.config.get<string>('TYPESENSE_HOST') ?? '';
     const port = this.config.get<number>('TYPESENSE_PORT') ?? 8108;
     const apiKey = this.config.get<string>('TYPESENSE_API_KEY') ?? '';
-    const protocol =
-      host === 'localhost' || host === '127.0.0.1' ? 'http' : 'https';
+
+    if (!host || host === 'localhost' || host === '127.0.0.1') {
+      this.logger.warn(
+        `Typesense enabled but host is "${host || '(empty)'}" — skipping connection`,
+      );
+      return;
+    }
+
+    const protocol = 'https';
 
     this.client = new Typesense.Client({
       nodes: [{ host, port, protocol }],
@@ -103,9 +110,14 @@ export class TypesenseService implements OnModuleInit {
     try {
       await this.client.collections(COLLECTION).retrieve();
     } catch {
-      this.logger.log('Creating Typesense collection "lots"');
-      await this.client.collections().create(LOTS_COLLECTION);
-      await this.syncAllLots();
+      try {
+        this.logger.log('Creating Typesense collection "lots"');
+        await this.client.collections().create(LOTS_COLLECTION);
+        await this.syncAllLots();
+      } catch (err) {
+        this.logger.error('Failed to initialize Typesense — continuing without search', err);
+        this.client = null;
+      }
     }
   }
 
